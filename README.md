@@ -33,7 +33,9 @@ On sign-in or signup, each guest binder is uploaded in batches of up to 10 cards
 
 The additive migrations `db/migrations/001-binder-details.sql`, `002-collection-organization.sql`, `003-card-details.sql`, and `004-collection-preferences.sql` have been applied to the configured Neon database. Run them in order when updating another existing deployment. Previous binders keep their colors and creation order; the sample binder keeps its black background. Changing a binder's game changes the available rarity choices while preserving existing card labels until edited. Cards have optional deck (100 characters) and card number (40 characters) fields. Images are optional; blank images render a designed placeholder. These fields persist through guest reloads, signup imports, account editing, and public sharing.
 
-Source pictures accept JPG, PNG, WebP, and GIF up to exactly 10 MiB (10,485,760 bytes). Pictures are resized to at most 850px on the longest side, without upscaling, and compressed to JPEG in the browser. GIF uploads become one still frame. The server validates the saved image's MIME and signature with a 250,000-byte cap. The form, file accept types, client limits, and tests share `lib/upload-guidelines.mjs`. Image data is stored in Neon with the card. For very large future collections, move image bytes to dedicated object storage and paginate card queries.
+Source pictures accept JPG, PNG, WebP, and GIF up to exactly 10 MiB (10,485,760 bytes). Pictures are resized to at most 850px on the longest side, without upscaling, and compressed to JPEG in the browser. GIF uploads become one still frame. The server validates the saved image's MIME and signature with a 250,000-byte cap. The form, file accept types, client limits, and tests share `lib/upload-guidelines.mjs`.
+
+New account pictures and guest imports upload to private Vercel Blob storage. Neon stores each file URL with its card. The browser receives an application image URL that checks binder ownership or the current share token on every request; revoking a share link also revokes its image access. Replacing or deleting cards removes their old Blob files. Existing Neon data-URL images remain readable. Guest pictures stay in localStorage until account transfer succeeds. Local development without Blob credentials retains the database image fallback; deployed uploads require a connected Blob store.
 
 ## Organizing collections
 
@@ -73,7 +75,7 @@ Repository: [joyceful-lee/mystuffsbetterbasic](https://github.com/joyceful-lee/m
 
 Import it into Vercel with root directory `.` and production branch `main`. Node 22.x, npm install/build commands, Next.js framework settings, and the Portland function region are prepared in the repository. The deployment guide in [docs/VERCEL.md](docs/VERCEL.md) lists the four server environment variables, Neon trusted-domain setup, and post-deployment checks. Credentials stay in ignored `.env.local` and encrypted deployment settings.
 
-GitHub Actions runs the automated tests and a production build without live Neon credentials. Vercel account connection, production environment variables, and the final production auth domain still need to be configured before the app can be used online.
+GitHub Actions runs the automated tests and a production build without live Neon credentials. The basic production project has Neon and a private Blob store connected. A separate copy must configure its own environment and trusted domain before deployment.
 
 ## Checks
 

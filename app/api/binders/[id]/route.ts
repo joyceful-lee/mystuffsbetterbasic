@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { account, ApiError, failure, jsonBody } from '../../../../lib/api';
 import { sql } from '../../../../lib/db';
 import { binderInput } from '../../../../lib/validation';
+import {removeCardImages} from '../../../../lib/image-storage';
+
 type Context={params:Promise<{id:string}>};
 export async function PATCH(request:Request,{params}:Context) {
  try { const user=await account(request);const id=z.string().uuid().parse((await params).id);const body=await jsonBody(request);const db=sql();
@@ -13,5 +15,5 @@ export async function PATCH(request:Request,{params}:Context) {
  }catch(e){return failure(e);}
 }
 export async function DELETE(request:Request,{params}:Context) {
- try {const user=await account(request);const id=z.string().uuid().parse((await params).id);const rows=await sql()`DELETE FROM binders WHERE id=${id} AND user_id=${user.id} RETURNING id`;if(!rows.length)throw new ApiError('Binder not found.',404);return Response.json({ok:true});}catch(e){return failure(e);}
+ try {const user=await account(request);const id=z.string().uuid().parse((await params).id);const images=await sql()`SELECT c.image FROM cards c JOIN binders b ON b.id=c.binder_id WHERE b.id=${id} AND b.user_id=${user.id}`;const rows=await sql()`DELETE FROM binders WHERE id=${id} AND user_id=${user.id} RETURNING id`;if(!rows.length)throw new ApiError('Binder not found.',404);await removeCardImages(images.map(row=>row.image));return Response.json({ok:true});}catch(e){return failure(e);}
 }

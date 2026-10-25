@@ -21,7 +21,7 @@ console.log('PASS unauthenticated access and cross-origin protections');
 const created=await a('/api/binders','POST',{name:`QA collection ${stamp}`,game:'Other',color:'purple'});assert.equal(created.status,201,JSON.stringify(created.data));const id=created.data.binder.id;
 const added=await a('/api/cards','POST',{binderId:id,name:'QA pixel card',image:picture,rarity:'Rare',favorite:false});assert.equal(added.status,201,JSON.stringify(added.data));const cardId=added.data.card.id;
 assert.equal((await a(`/api/cards/${cardId}`,'PATCH',{favorite:true})).status,200);
-let own=(await a('/api/binders')).data.binders.find(x=>x.id===id);assert.equal(own.cards[0].favorite,true);assert.equal(own.cards[0].image,picture);
+let own=(await a('/api/binders')).data.binders.find(x=>x.id===id);assert.equal(own.cards[0].favorite,true);assert.ok(own.cards[0].image===picture||own.cards[0].image===`/api/cards/${cardId}/image`);
 assert.equal((await b('/api/binders')).data.binders.length,0);
 assert.equal((await b(`/api/binders/${id}`,'PATCH',{shared:true})).status,404);
 assert.equal((await b(`/api/cards/${cardId}`,'PATCH',{favorite:false})).status,404);
