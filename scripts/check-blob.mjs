@@ -9,6 +9,7 @@ try{
  const created=await owner('/api/binders','POST',{name:'Blob upload QA',game:'Other',color:'blue'});assert.equal(created.status,201,JSON.stringify(created.data));const id=created.data.binder.id;binders.push(id);
  const added=await owner('/api/cards','POST',{binderId:id,name:'Blob pixel',image:picture,rarity:'Rare'});assert.equal(added.status,201,JSON.stringify(added.data));const card=added.data.card;
  assert.equal(card.image,`/api/cards/${card.id}/image`,'Upload must use Blob, not a database data URL');
+ if(process.env.DATABASE_URL){const {neon}=await import('@neondatabase/serverless');const db=neon(process.env.DATABASE_URL);const [row]=await db`SELECT image FROM cards WHERE id=${card.id}`;assert.match(row.image,/^https:\/\/[^/]+\.private\.blob\.vercel-storage\.com\//);const raw=await fetch(row.image);assert.equal(raw.ok,false,'Private Blob must reject anonymous file access');console.log('PASS Neon stores a private Blob URL and the file denies direct anonymous access');}
  const ownImage=await owner(card.image);assert.equal(ownImage.status,200);assert.match(ownImage.type,/image\/png/);assert.deepEqual(ownImage.bytes,Buffer.from(picture.split(',')[1],'base64'));
  assert.equal((await anon(card.image)).status,404);assert.equal((await other(card.image)).status,404);
  assert.equal((await owner(`/api/cards/${card.id}`,'PATCH',{name:'Renamed pixel',image:card.image,rarity:'Rare'})).status,200);
