@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { authClient } from '../lib/auth-client';
 type Mode='sign-in'|'sign-up'|'forgot'|'reset';
-export default function AuthForm({initial='sign-up',token='',invalidLink=false}:{initial?:Mode;token?:string;invalidLink?:boolean}) {
+export default function AuthForm({initial='sign-up',token='',invalidLink=false,guestSummary,onContinueGuest}:{initial?:Mode;token?:string;invalidLink?:boolean;guestSummary?:{binders:number;cards:number};onContinueGuest?:()=>void}) {
  const [mode,setMode]=useState<Mode>(initial);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');
  function changeMode(next:Mode){setMode(next);setError('');setMessage('');}
  async function submit(e:React.FormEvent<HTMLFormElement>) {
@@ -40,6 +40,7 @@ export default function AuthForm({initial='sign-up',token='',invalidLink=false}:
  {error&&<p role="alert" className="form-error">{error}</p>}<button className="button primary wide" disabled={busy}>{busy?'Please wait…':mode==='forgot'?'Send reset link':mode==='reset'?'Save new password':mode==='sign-up'?'Create my account':'Log in'}<ArrowRight size={17}/></button></form>}
  {mode==='sign-in'&&<button className="text-button" disabled={busy} onClick={()=>changeMode('forgot')}>Forgot password?</button>}
  {mode==='reset'&&<button className="text-button" disabled={busy} onClick={()=>changeMode('forgot')}>Request a new reset link</button>}
- {mode==='sign-up'&&<p className="small muted">Your guest binders move to your account after you sign in.</p>}
+ {(mode==='sign-up'||mode==='sign-in')&&guestSummary&&<p className="guest-auth-note">{guestSummary.binders?`Your ${guestSummary.binders} guest ${guestSummary.binders===1?'binder':'binders'} and ${guestSummary.cards} ${guestSummary.cards===1?'card':'cards'} will move into your account after you sign in, alongside any binders already there. Your browser copy stays here until the upload finishes.`:'You can keep collecting as a guest and create an account whenever you are ready. An account lets you open your collection on other devices and share binder links.'}</p>}
+ {(mode==='sign-up'||mode==='sign-in')&&onContinueGuest&&<button className="text-button" disabled={busy} onClick={onContinueGuest}>Continue as guest</button>}
  <button className="text-button" disabled={busy} onClick={()=>changeMode(mode==='sign-up'||mode==='forgot'||mode==='reset'?'sign-in':'sign-up')}>{mode==='sign-up'?'Already have an account? Log in':mode==='forgot'||mode==='reset'?'Back to log in':'New here? Create an account'}</button></>;
 }

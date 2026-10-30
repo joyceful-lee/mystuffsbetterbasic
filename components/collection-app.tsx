@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownWideNarrow, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Grid2X2, Heart, ImagePlus, Layers, LayoutGrid, Link2, List, LogOut, Pencil, Plus, Search, ShieldCheck, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import type { Binder, Card, User } from '../lib/types';
-import { readGuest, writeGuest, migrateGuest } from '../lib/guest-state.mjs';
+import { GUEST_KEY, readGuest, writeGuest, migrateGuest } from '../lib/guest-state.mjs';
+import {restoreGuestCopies} from '../lib/guest-backup.mjs';
+import GuestSavePanel, {downloadGuestBackup} from './guest-save-panel';
 import { allCards, allFavorites, coverCard, reorderItems } from '../lib/collection.mjs';
 import { appearanceStyle, binderAppearanceStyle, coverPaletteFor } from '../lib/appearance.mjs';
 import { binderThemes, games, GUEST_CARD_LIMIT, GUEST_IMAGE_DATA_LIMIT, isRarityForGame, paletteFor, raritiesFor, rarityRank } from '../lib/binder-config.mjs';
@@ -47,6 +49,9 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
  const [binders,setBinders]=useState<Binder[]>(shared?[shared]:[]);
  const [active,setActive]=useState(shared?.id||'showcase');
  const [sampleHidden,setSampleHidden]=useState(false);
+ const [guestRaw,setGuestRaw]=useState<string|null>(null),[externalChange,setExternalChange]=useState(false);
+ const [syncProgress,setSyncProgress]=useState({completed:0,total:0});
+ const guestSnapshot=useRef<string|null>(null);
  const [view,setView]=useState<'binders'|'favorites'|'all-cards'>('binders');
  const [bindersExpanded,setBindersExpanded]=useState(true);
  const [ready,setReady]=useState(!!shared),[syncing,setSyncing]=useState(false),[syncError,setSyncError]=useState(''),[error,setError]=useState(''),[guestIssue,setGuestIssue]=useState(false);
@@ -63,7 +68,7 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
  const favorites=useMemo(()=>allFavorites(binders),[binders]);
  const collectionCards=useMemo(()=>allCards(binders),[binders]);
  const total=binders.reduce((count,item)=>count+item.cards.length,0);
- const blocked=busy||syncing||!!syncError||guestIssue||!ready;
+ const blocked=busy||syncing||!!syncError||guestIssue||externalChange||!ready;
  const detailBinder=detailRef?(binders.find(item=>item.id===detailRef.binderId)||(detailRef.binderId==='showcase'?showcase:null)):null;
  const detailCard=detailBinder?.cards.find(card=>card.id===detailRef?.cardId)||null;
  const detailOwned=!!detailBinder&&!shared&&detailBinder.id!=='showcase';
@@ -83,20 +88,32 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
 
  function toast(message:string){setNotice(message);if(noticeTimer.current)clearTimeout(noticeTimer.current);noticeTimer.current=setTimeout(()=>setNotice(''),4200);}
  async function loadAccount(){
-  setSyncing(true);setSyncError('');
-  try{const guestSampleHidden=localStorage.getItem(SAMPLE_HIDDEN_KEY)==='true';if(guestSampleHidden){await api('/api/preferences','PATCH',{sampleHidden:true});localStorage.removeItem(SAMPLE_HIDDEN_KEY);}const preferences=await api('/api/preferences');setSampleHidden(preferences.sampleHidden);const count=await migrateGuest(localStorage,item=>api('/api/import','POST',item));const data=await api('/api/binders');setBinders(data.binders);setActive(data.binders[0]?.id||(preferences.sampleHidden?'empty':'showcase'));if(count)toast('Your guest binders have been saved to your account.');}
-  catch(e){setSyncError(e instanceof Error?e.message:'Could not load your collection.');}
+  setSyncing(true);setSyncError('');setSyncProgress({completed:0,total:0});
+  try{
+   let browserStorage:Storage|null=null;try{localStorage.getItem(GUEST_KEY);browserStorage=localStorage;}catch{setError('Browser storage is unavailable, so we could not check for a guest collection. Your account binders can still be used.');}
+   setGuestRaw(browserStorage?.getItem(GUEST_KEY)||null);
+   if(browserStorage?.getItem(SAMPLE_HIDDEN_KEY)==='true'){await api('/api/preferences','PATCH',{sampleHidden:true});browserStorage.removeItem(SAMPLE_HIDDEN_KEY);}
+   const preferences=await api('/api/preferences');setSampleHidden(preferences.sampleHidden);
+   const count=browserStorage?await migrateGuest(browserStorage,item=>api('/api/import','POST',item),setSyncProgress):0;
+   setGuestRaw(null);const data=await api('/api/binders');setBinders(data.binders);setActive(data.binders[0]?.id||(preferences.sampleHidden?'empty':'showcase'));if(count)toast('Your guest binders have been saved to your account.');
+  }
+  catch(e){try{setGuestRaw(localStorage.getItem(GUEST_KEY));}catch{}setSyncError(e instanceof Error?e.message:'Could not load your collection.');}
   finally{setSyncing(false);setReady(true);}
+ }
+ function loadGuest(){
+  try{const raw=localStorage.getItem(GUEST_KEY);setGuestRaw(raw);guestSnapshot.current=raw;const saved=readGuest(localStorage),hidden=localStorage.getItem(SAMPLE_HIDDEN_KEY)==='true';const probe='mystuffsbetter.storage-check';localStorage.setItem(probe,'1');localStorage.removeItem(probe);setSampleHidden(hidden);setBinders(saved);setActive(current=>saved.some(b=>b.id===current)?current:saved[0]?.id||(hidden?'empty':'showcase'));setGuestIssue(false);setExternalChange(false);setError('');setDialog(null);setConfirm(null);setDetailRef(null);}
+  catch(e){setGuestIssue(true);setError(e instanceof Error?e.message:'Browser storage is unavailable. Enable site storage or use another browser.');}
  }
  useEffect(()=>{
   if(loaded.current||shared)return;loaded.current=true;
   if(user){void loadAccount();return;}
-  try{const saved=readGuest(localStorage),hidden=localStorage.getItem(SAMPLE_HIDDEN_KEY)==='true';setSampleHidden(hidden);setBinders(saved);setActive(saved[0]?.id||(hidden?'empty':'showcase'));}
-  catch(e){setGuestIssue(true);setError(e instanceof Error?e.message:'Browser storage is unavailable. Please enable it or sign in.');}
+  loadGuest();
   setReady(true);
  },[]);
  useEffect(()=>()=>{if(noticeTimer.current)clearTimeout(noticeTimer.current);},[]);
- function commit(next:Binder[]){if(guest){try{writeGuest(localStorage,next);}catch{throw new Error('This change could not be saved because browser storage is full or unavailable. Creating an account lets you save online.');}}setBinders(next);}
+ useEffect(()=>{if(!guest)return;const changed=(event:StorageEvent)=>{if(event.storageArea===localStorage&&(event.key===GUEST_KEY||event.key===SAMPLE_HIDDEN_KEY||event.key===null))setExternalChange(true);};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[guest]);
+ function commit(next:Binder[]){if(guest){try{const raw=writeGuest(localStorage,next,guestSnapshot.current);guestSnapshot.current=raw;setGuestRaw(raw);}catch(e){if(e instanceof Error&&e.message.includes('another tab')){setExternalChange(true);throw e;}throw new Error('This change was not saved because browser storage is full or unavailable. Your earlier save is still here. Download a backup or create an account before trying again.');}}setBinders(next);}
+ function restoreBackup(incoming:Binder[],replaceDamaged:boolean){if(busy||syncing||externalChange||!ready||(guestIssue&&!replaceDamaged))return false;try{const current=replaceDamaged?[]:binders,next=restoreGuestCopies(current,incoming);commit(next);setGuestIssue(false);setError('');setActive(next[current.length].id);setView('binders');toast('Your backup binders have been saved in this browser.');return true;}catch(e){setError(e instanceof Error?e.message:'The backup could not be saved. Your collection has not changed.');return false;}}
  function select(id:string){setActive(id);setView('binders');setQuery('');setFilter('all');setSort('custom');setError('');}
  function open(type:Dialog){
   setError('');setDialog(type);
@@ -109,7 +126,7 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
  function showDetails(entry:CardEntry){setDetailRef({binderId:entry.binder.id,cardId:entry.card.id});setError('');setDialog('details');}
  function editDetails(){if(!detailBinder||!detailCard)return;select(detailBinder.id);setEditCard(detailCard);setUpload(detailCard.image);setDialog('card');}
  function requestDelete(type:'binder'|'card',id:string,name:string){setDialog(null);setError('');setConfirm({type,id,name});}
- async function perform(action:()=>Promise<void>){if(busy||syncing)return;setBusy(true);setError('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
+ async function perform(action:()=>Promise<void>){if(busy||syncing||!ready||(guest&&(guestIssue||externalChange)))return;setBusy(true);setError('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}}
  async function submitBinder(event:React.FormEvent<HTMLFormElement>){
   event.preventDefault();const data=new FormData(event.currentTarget);
   const payload={name:String(data.get('name')).trim(),game:binderGame,color:coverColor,backgroundColor,bio:String(data.get('bio')).trim(),theme};
@@ -166,9 +183,10 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
  <div className="main-wrap">
   <header className="topbar"><div className="breadcrumb"><BookOpen size={17}/><span>{shared?'Shared binder':globalFavorites?'Favorites':globalCards?'All cards':'My binders'}</span>{!collectionView&&<><ChevronRight size={14}/><strong>{binder.name}</strong></>}</div><div className="topbar-right"><DisplayModeSwitch/>{(!user||shared)&&<><span className="live-dot"/><span className="top-status">{shared?'View only':'Guest mode'}</span></>}{!user&&!shared&&<button className="button login-button" onClick={()=>open('login')}>Log in<ArrowRight size={15}/></button>}</div></header>
   <main>
-   {guest&&<div className="guest-banner"><span className="guest-banner-icon"><ShieldCheck size={17}/></span><p>Your guest binders are saved only in this browser and may be lost if you clear its data.</p><button onClick={()=>open('signup')}>Save my collection<ArrowRight size={15}/></button></div>}
-   {syncing&&<div className="status-banner" role="status"><Cloud size={18}/>Saving your guest binders to your account…</div>}
-   {syncError&&<div className="error-banner" role="alert">{syncError}<button onClick={()=>void loadAccount()}>Retry</button><span>Your browser copy stays here until the upload succeeds.</span></div>}
+   {guest&&<GuestSavePanel binders={binders} raw={guestRaw} disabled={busy||syncing||externalChange||!ready} issue={guestIssue} onRestore={restoreBackup} onAccount={()=>open('signup')} onRetry={loadGuest}/>}
+   {guest&&externalChange&&<div className="error-banner" role="alert">Your collection changed in another tab. Review the latest save before editing; any open form will close.<button onClick={loadGuest}>Load latest save</button></div>}
+   {syncing&&<div className="status-banner guest-transfer" role="status"><Cloud size={18}/><div>Moving your guest collection into your account. Keep this page open.{syncProgress.total>0&&<><progress aria-label="Guest collection upload" value={syncProgress.completed} max={syncProgress.total}/><span>{syncProgress.completed} of {syncProgress.total} batches saved</span></>}</div></div>}
+   {syncError&&<div className="error-banner" role="alert">{syncError}<button onClick={()=>void loadAccount()}>Retry</button><span>Your browser copy stays here until the upload succeeds.</span>{guestRaw&&<button onClick={()=>downloadGuestBackup(guestRaw)}>Download guest backup</button>}</div>}
    {error&&!dialog&&!confirm&&<div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
    {!shared&&!collectionView&&<section className="collection-desk" aria-labelledby="desk-title">
     <div className="desk-heading"><div><h1 id="desk-title">Collection desk</h1></div><button className="button primary" disabled={blocked} onClick={()=>open('binder')}><Plus size={18}/>Create a binder</button></div>
@@ -191,7 +209,8 @@ export default function BinderApp({user,shared}:{user:User|null;shared?:Binder})
  </div>
  {notice&&<div className="toast" role="status"><Check size={17}/>{notice}</div>}
  {dialog&&<Modal title={title} className={dialog==='details'?'card-detail-modal':dialog.startsWith('order-')?'order-modal':''} close={()=>{if(!busy&&!uploadBusy){setDialog(null);setError('');}}}>
-  {(dialog==='signup'||dialog==='login')&&<AuthForm initial={dialog==='login'?'sign-in':'sign-up'}/>}
+  {guest&&externalChange&&<div className="error-banner" role="alert">Another tab changed your collection, so saving is paused. Loading the latest save will close this form.<button onClick={loadGuest}>Load latest save</button></div>}
+  {(dialog==='signup'||dialog==='login')&&<AuthForm initial={dialog==='login'?'sign-in':'sign-up'} guestSummary={guest?{binders:binders.length,cards:total}:undefined} onContinueGuest={guest?()=>setDialog(null):undefined}/>}
   {dialog==='binder'&&<form className="stack-form" onSubmit={submitBinder}>
    <p className="muted">Give this binder a name so you can find it when you add cards.</p>
    <label>Binder name<input name="name" required maxLength={60} defaultValue={editBinder?.name} placeholder="e.g. My Pokémon binder" autoFocus/></label>

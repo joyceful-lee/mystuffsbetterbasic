@@ -37,6 +37,12 @@ Source pictures accept JPG, PNG, WebP, and GIF up to exactly 10 MiB (10,485,760 
 
 New account pictures and guest imports upload to private Vercel Blob storage. Neon stores each file URL with its card. The browser receives an application image URL that checks binder ownership or the current share token on every request; revoking a share link also revokes its image access. Replacing or deleting cards removes their old Blob files. Existing Neon data-URL images remain readable. Guest pictures stay in localStorage until account transfer succeeds. Local development without Blob credentials retains the database image fallback; deployed uploads require a connected Blob store.
 
+## Guest saves and recovery
+
+The guest-save panel shows the binder/card limits and last successful browser-save time. Guests can download a versioned JSON backup, including pictures and collection details, then preview and restore its binders as new copies without overwriting their existing collection. Restores validate file size, fields, image formats, IDs, rarity labels, covers, and guest limits. Older rarity labels remain intact when a binder's game has changed. A damaged browser save can still be downloaded; replacing it with a valid backup requires a separate confirmation. Failed browser writes preserve the earlier save and never update the UI as though the change succeeded.
+
+Other-tab changes pause guest editing until the latest save is loaded, and writes also compare the browser snapshot before replacing it. Account transfers show acknowledged batch progress and retain browser data on upload failure or concurrent changes. Signup and login explain what will transfer and offer Continue as guest. Account binders remain accessible when browser storage is unavailable. These changes apply to the basic version; the separate API version is maintained in its own chat.
+
 ## Organizing collections
 
 The sidebar Favorites view gathers favorite cards from all saved binders and shows each card's source binder. The favorites tab inside a binder remains local to that binder. The sample is excluded from owned collections.
