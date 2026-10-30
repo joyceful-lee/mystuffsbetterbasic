@@ -51,6 +51,8 @@ Anyone can explore public binders and search by binder, bio, or collector name, 
 
 Public status is checked on gallery queries, binder pages, image downloads, reactions, and update feeds. Going private hides saved likes/subscriptions and stops public image access. Republishing does not announce cards added while private. Likes and subscriptions remain saved, so they can reappear if the same binder becomes public again. Deleting a binder cascades its relationships. The additive `005-public-binders.sql` migration adds private-by-default visibility and owner-checked relationship tables with RLS enabled. `scripts/check-community.mjs` verifies the cross-account flow using disposable QA binders and removes those binders afterwards.
 
+For controlled account imports, `006-card-image-imports.sql` adds a private import audit table. `scripts/finalize-card-imports.mjs` processes only explicitly queued pictures, reads them back from private Blob storage, verifies SHA-256 checksums, and updates each card atomically. It is a manual maintenance command, outside the normal build flow. Source credentials and account exports must never be committed.
+
 ## Organizing collections
 
 The sidebar Favorites view gathers favorite cards from all saved binders and shows each card's source binder. The favorites tab inside a binder remains local to that binder. The sample is excluded from owned collections.

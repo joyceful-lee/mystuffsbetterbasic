@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs",
-    "prebuild": "node scripts/finalize-card-imports.mjs"
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@neondatabase/auth": "0.6.0-beta",
