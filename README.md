@@ -43,6 +43,14 @@ The guest-save panel shows the binder/card limits and last successful browser-sa
 
 Other-tab changes pause guest editing until the latest save is loaded, and writes also compare the browser snapshot before replacing it. Account transfers show acknowledged batch progress and retain browser data on upload failure or concurrent changes. Signup and login explain what will transfer and offer Continue as guest. Account binders remain accessible when browser storage is unavailable. These changes apply to the basic version; the separate API version is maintained in its own chat.
 
+## Public binders, likes, and subscriptions
+
+Account binders start private. Open **Visibility & sharing** on a binder to publish it in `/community`, or make it private and revoke its viewing links. Publishing displays the collector name, binder bio, and card details; it never exposes the account email. Existing unlisted viewing links remain usable until their owner chooses Private. Guest binders remain browser-only until account transfer.
+
+Anyone can explore public binders and search by binder, bio, or collector name, filter by game, and sort by latest cards, newly public, or most liked. Signed-in collectors can like other people's binders into `/community/liked` and independently subscribe through `/community/subscribed`. New-card updates appear at `/community/updates`, with an unread binder count in navigation. The app checks for updates while active; these are in-app notifications, not email or push messages. Mark seen acknowledges only cards present when that update list was loaded. Unsubscribing stops updates, and subscribing again starts fresh.
+
+Public status is checked on gallery queries, binder pages, image downloads, reactions, and update feeds. Going private hides saved likes/subscriptions and stops public image access. Republishing does not announce cards added while private. Likes and subscriptions remain saved, so they can reappear if the same binder becomes public again. Deleting a binder cascades its relationships. The additive `005-public-binders.sql` migration adds private-by-default visibility and owner-checked relationship tables with RLS enabled. `scripts/check-community.mjs` verifies the cross-account flow using disposable QA binders and removes those binders afterwards.
+
 ## Organizing collections
 
 The sidebar Favorites view gathers favorite cards from all saved binders and shows each card's source binder. The favorites tab inside a binder remains local to that binder. The sample is excluded from owned collections.

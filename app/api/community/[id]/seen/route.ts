@@ -1,0 +1,4 @@
+import {z} from 'zod';
+import {account,ApiError,failure,jsonBody} from '../../../../../lib/api';
+import {sql} from '../../../../../lib/db';
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const user=await account(request),id=z.string().uuid().parse((await params).id),{asOf}=z.object({asOf:z.string().datetime({offset:true})}).parse(await jsonBody(request));const rows=await sql()`UPDATE binder_reactions r SET seen_at=GREATEST(r.seen_at,LEAST(${asOf}::timestamptz,now())) FROM binders b WHERE r.binder_id=${id} AND r.user_id=${user.id} AND r.subscribed_at IS NOT NULL AND b.id=r.binder_id AND b.visibility='public' RETURNING r.binder_id`;if(!rows.length)throw new ApiError('Subscription not found.',404);return Response.json({ok:true});}catch(e){return failure(e);}}
