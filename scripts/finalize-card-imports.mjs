@@ -27,7 +27,7 @@ try{
    const verified=Buffer.from(await new Response(stored.stream).arrayBuffer());if(hash(verified)!==row.sha256)throw new Error('Imported image verification failed.');
    stage='verified database update';const [updated]=await db.transaction([
     db`UPDATE cards SET image=${uploaded.url} WHERE id=${row.card_id} AND image=${row.image} RETURNING id`,
-    db`UPDATE card_image_imports j SET completed_at=now(),status=CASE WHEN c.image=${uploaded.url} THEN 'verified' ELSE 'superseded' END,verified_bytes=CASE WHEN c.image=${uploaded.url} THEN ${verified.length} ELSE NULL END FROM cards c WHERE j.card_id=${row.card_id} AND c.id=j.card_id RETURNING status`
+    db`UPDATE card_image_imports j SET completed_at=now(),status=CASE WHEN c.image=${uploaded.url} THEN 'verified' ELSE 'superseded' END,verified_bytes=CASE WHEN c.image=${uploaded.url} THEN ${verified.length}::integer ELSE NULL END FROM cards c WHERE j.card_id=${row.card_id} AND c.id=j.card_id RETURNING status`
    ]);
    if(!updated.length)await del(uploaded.url);else count++;
   }catch(error){await del(uploaded.url).catch(()=>{});throw error;}
