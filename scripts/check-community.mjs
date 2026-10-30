@@ -21,8 +21,20 @@ try{
  const publicPage=check(await anon(`/community/${id}`),200);assert.ok(!publicPage.includes(`community-qa-${stamp}-0@example.com`));if(new URL(base).hostname!=='localhost')assert.match(old.image,/^\/api\/cards\//);if(old.image.startsWith('/api/'))check(await anon(old.image),200);
  check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:true},false),403);
  for(let i=0;i<2;i++){const reaction=check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:true}),200);assert.equal(reaction.likes,1);}
+ check(await anon('/api/notifications'),401);
+ let notices=check(await owner('/api/notifications'),200);assert.equal(notices.notifications.length,1);assert.equal(notices.notifications[0].kind,'like');assert.equal(notices.notifications[0].actorName,'Collector QA 1');assert.ok(!JSON.stringify(notices).includes('@example.com'));assert.equal(check(await owner('/api/community/status'),200).activityUnread,1);
+ const likeNotice=notices.notifications[0].id;
+ check(await follower('/api/notifications/read','POST',{id:likeNotice}),404);check(await owner('/api/notifications/read','POST',{id:likeNotice},false),403);
+ check(await owner('/api/notifications/read','POST',{id:likeNotice}),200);check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:true}),200);assert.equal(check(await owner('/api/community/status'),200).activityUnread,0);
+ check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:false}),200);check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:true}),200);assert.equal(check(await owner('/api/community/status'),200).activityUnread,1);assert.equal(check(await owner('/api/notifications'),200).notifications.length,1);
+ assert.equal(check(await follower('/api/notifications'),200).notifications.length,0);
  assert.equal((await list(follower,'liked')).length,1);assert.equal((await list(other,'liked')).length,0);
  check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'subscribe',enabled:true}),200);assert.equal((await list(follower,'subscribed')).length,1);assert.equal((await list(follower,'updates')).length,0);
+ notices=check(await owner('/api/notifications'),200);assert.equal(notices.notifications.length,2);assert.ok(notices.notifications.some(n=>n.kind==='subscribe'));assert.equal(check(await owner('/api/community/status'),200).activityUnread,2);
+ check(await owner('/api/notifications/read','POST',{allThrough:notices.asOf}),200);assert.equal(check(await owner('/api/community/status'),200).activityUnread,0);
+ check(await other(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:true}),200);check(await owner('/api/notifications/read','POST',{allThrough:notices.asOf}),200);assert.equal(check(await owner('/api/community/status'),200).activityUnread,1,'Mark all read must preserve activity arriving after the list was opened');
+ assert.equal(check(await owner('/api/notifications?filter=unread'),200).notifications.length,1);
+ check(await other(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:false}),200);
  check(await owner('/api/cards','POST',{binderId:id,name:'New card one',image:'',rarity:'Epic'}),201);
  let updates=await list(follower,'updates');assert.equal(updates.length,1);assert.equal(updates[0].newCards,1);assert.equal(check(await follower('/api/community/status'),200).unread,1);assert.equal((await list(other,'updates')).length,0);
  check(await other(`/api/community/${id}/seen`,'POST',{asOf:updates[0].asOf}),404);
@@ -36,5 +48,5 @@ try{
  check(await owner('/api/cards','POST',{binderId:id,name:'Added privately',image:'',rarity:'Rare'}),201);check(await owner(`/api/binders/${id}`,'PATCH',{visibility:'public'}),200);assert.equal((await list(follower,'updates')).length,0,'Private additions must not become subscription updates');
  check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'subscribe',enabled:false}),200);check(await owner('/api/cards','POST',{binderId:id,name:'After unsubscribe',image:'',rarity:'Rare'}),201);assert.equal((await list(follower,'updates')).length,0);
  check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'subscribe',enabled:true}),200);assert.equal((await list(follower,'updates')).length,0);check(await follower(`/api/community/${id}/reaction`,'PATCH',{kind:'like',enabled:false}),200);assert.equal((await list(follower,'liked')).length,0);
- console.log('PASS public discovery/filtering, private defaults, owner isolation, independent/idempotent likes and subscriptions, new-card updates, seen state, unsubscribe, public/private image access, legacy-link revocation and republishing privacy');
-}finally{for(const id of created)check(await owner(`/api/binders/${id}`,'DELETE'),200);}
+ console.log('PASS owner notification isolation, authenticated actor names, read/unread state, duplicate suppression, reactivation, mark-all cutoff; public discovery/filtering, private defaults, owner isolation, independent/idempotent likes and subscriptions, new-card updates, seen state, unsubscribe, public/private image access, legacy-link revocation and republishing privacy');
+}finally{for(const id of created)check(await owner(`/api/binders/${id}`,'DELETE'),200);assert.equal(check(await owner('/api/notifications'),200).notifications.length,0);}

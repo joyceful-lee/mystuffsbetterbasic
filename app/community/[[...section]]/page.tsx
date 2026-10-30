@@ -9,7 +9,7 @@ import {z} from 'zod';
 export const dynamic='force-dynamic';
 export default async function Community({params}:{params:Promise<{section?:string[]}>}){
  const {section=[]}=await params;if(section.length>1)notFound();const part=section[0]||'explore',session=await currentUser(),user=session?{id:session.id,name:session.name,email:session.email}:null;
- if(['explore','liked','subscribed','updates'].includes(part))return <CommunityApp key={part} user={user} view={part as 'explore'|'liked'|'subscribed'|'updates'}/>;
+ if(['explore','liked','subscribed','updates','notifications'].includes(part))return <CommunityApp key={part} user={user} view={part as 'explore'|'liked'|'subscribed'|'updates'|'notifications'}/>;
  if(!z.string().uuid().safeParse(part).success)notFound();
  const [row]=await sql()`SELECT b.id,b.name,b.game,b.color,b.bio,b.theme,b.background_color AS "backgroundColor",b.cover_card_id AS "coverCardId",b.visibility,b.public_name AS "publicName",NULL AS "shareToken",
   COALESCE((SELECT json_agg(json_build_object('id',c.id,'name',c.name,'image',c.image,'rarity',c.rarity,'favorite',c.favorite,'deck',c.deck,'cardNumber',c.card_number) ORDER BY c.position,c.created_at,c.id) FROM cards c WHERE c.binder_id=b.id),'[]') AS cards,
