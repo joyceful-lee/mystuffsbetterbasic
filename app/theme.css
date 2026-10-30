@@ -259,10 +259,9 @@
 .binder-section .search input::placeholder { color:var(--page-muted); }
 .binder-section .view-switch button { color:var(--page-muted); }
 .binder-section .icon-button { color:var(--page-muted); }
-.binder-section .card-image-wrap { box-shadow:inset 0 0 0 4px color-mix(in srgb,var(--surface-raised) 14%,transparent),1px 3px 4px #0002; }
-.binder-section .card-image-wrap:after { border-color:color-mix(in srgb,var(--page-ink) 20%,transparent); }
+.binder-section .card-image-wrap { box-shadow:1px 3px 4px #0002; }
 .binder-section .card-open:focus-visible { outline:none; }
-.binder-section .card-image-wrap:has(.card-open:focus-visible) { border-color:var(--page-accent); box-shadow:inset 0 0 0 2px var(--page-accent); }
+.binder-section .card-image-wrap:has(.card-open:focus-visible) { border-color:var(--page-accent); outline:2px solid var(--page-accent); outline-offset:3px; }
 .binder-section .card-slot { color:var(--page-muted); }
 .binder-section .card-heart { color:var(--page-ink); background:color-mix(in srgb,var(--surface) 94%,transparent); border-color:var(--page-border); }
 .binder-section .card-heart:hover:not(:disabled) { background:var(--surface-raised); }
